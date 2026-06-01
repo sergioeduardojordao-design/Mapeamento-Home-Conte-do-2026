@@ -18,7 +18,8 @@ def conectar_sheets():
     creds_dict = json.loads(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
     client = gspread.authorize(creds)
-    return client.open("Mapeamento 2026").sheet1
+    # Conectando diretamente pelo ID da planilha
+    return client.open_by_key("1uuqIvekMUt3m7hKyFNXXUMZ0535Sz4deKfi1HRb9VLY").sheet1
 
 # --- FUNÇÕES DE APOIO ---
 def limpar_valor_numerico(val):
