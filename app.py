@@ -18,27 +18,21 @@ def conectar_sheets():
     creds_dict = json.loads(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
     client = gspread.authorize(creds)
-    # Conectando diretamente pelo ID da planilha
     return client.open_by_key("1uuqIvekMUt3m7hKyFNXXUMZ0535Sz4deKfi1HRb9VLY").sheet1
 
-# --- FUNÇÕES DE APOIO ---
-def limpar_valor_numerico(val):
-    try: return int(float(str(val).replace(" ", "").replace(".", "").replace(",", "")))
-    except: return 0
-
-def limpar_taxa_float(val):
-    try: return float(str(val).replace("%", "").replace(",", "."))
-    except: return 0.0
-
-@st.cache_data(ttl=300)
-def carregar_dados():
+# --- FUNÇÕES DE PROCESSAMENTO ---
+@st.cache_data(ttl=600)
+def carregar_dados_do_sheets():
     ws = conectar_sheets()
     data = ws.get_all_values()
     df = pd.DataFrame(data[1:], columns=data[0])
-    # Limpeza básica e conversão de tipos
+    
+    # Aplicar limpezas
     for col in df.columns:
         if "TAXA" in col.upper() or "ENGAJAMENTO" in col.upper():
-            df[col] = df[col].apply(limpar_taxa_float)
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace("%", "").str.replace(",", "."), errors='coerce')
+        elif col not in ["CRIADORA", "CIDADE", "UF", "PRINCIPAL REDE", "OBS", "E-mail de contato", "Telefone"]:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     return df
 
 # --- INTERFACE ---
@@ -51,13 +45,24 @@ if st.session_state.page == 'entrada':
     if c_r.button("🔍 ACESSO VISITANTE"): st.session_state.page = 'visitante'; st.rerun()
 
 elif st.session_state.page == 'admin':
-    df_base = carregar_dados()
+    df_base = carregar_dados_do_sheets()
     if st.button("⬅ Voltar"): st.session_state.page = 'entrada'; st.rerun()
-    st.title("Painel Administrativo")
-    st.dataframe(df_base, use_container_width=True)
+    
+    tab1, tab2 = st.tabs(["📊 Inteligência de Dados", "🗺️ Mapa"])
+    
+    with tab1:
+        st.subheader("Filtros")
+        uf_f = st.multiselect("UF", df_base["UF"].unique())
+        df_f = df_base[df_base["UF"].isin(uf_f)] if uf_f else df_base
+        st.dataframe(df_f, use_container_width=True)
+        
+    with tab2:
+        st.subheader("Mapa de Atuação")
+        # Aqui você coloca o seu código original do Folium, usando df_f
+        st.write("Mapa em desenvolvimento...")
 
 elif st.session_state.page == 'visitante':
-    df_base = carregar_dados()
+    df_base = carregar_dados_do_sheets()
     if st.button("⬅ Voltar"): st.session_state.page = 'entrada'; st.rerun()
-    st.title("🔍 Área do Visitante")
-    st.dataframe(df_base.head(5), use_container_width=True)
+    st.subheader("Visualização Visitante")
+    st.dataframe(df_base.head(10))
